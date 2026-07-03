@@ -22,6 +22,36 @@ def main() -> None:
 @click.argument("image_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--config", "config_path", default="config.yaml", show_default=True, type=click.Path(path_type=Path))
 @click.option("--output-dir", type=click.Path(path_type=Path), default=None)
+def ocr(image_path: Path, config_path: Path, output_dir: Path | None) -> None:
+    """Run PaddleOCR text recognition only."""
+
+    config = load_config(config_path)
+    out_dir = output_dir or config.paths.output_dir
+    result = PaddleOCRRecognizer(config.paths.ocr_model_dir).recognize(image_path)
+    json_path, annotated_path = save_stage_outputs(result, out_dir)
+    click.echo(f"OCR JSON: {json_path}")
+    click.echo(f"OCR annotated image: {annotated_path}")
+
+
+@main.command()
+@click.argument("image_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--config", "config_path", default="config.yaml", show_default=True, type=click.Path(path_type=Path))
+@click.option("--output-dir", type=click.Path(path_type=Path), default=None)
+def yolo(image_path: Path, config_path: Path, output_dir: Path | None) -> None:
+    """Run YOLO11 arrow and connector recognition only."""
+
+    config = load_config(config_path)
+    out_dir = output_dir or config.paths.output_dir
+    result = YOLOConnectorRecognizer(config.paths.yolo_model_dir).recognize(image_path)
+    json_path, annotated_path = save_stage_outputs(result, out_dir)
+    click.echo(f"YOLO JSON: {json_path}")
+    click.echo(f"YOLO annotated image: {annotated_path}")
+
+
+@main.command()
+@click.argument("image_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--config", "config_path", default="config.yaml", show_default=True, type=click.Path(path_type=Path))
+@click.option("--output-dir", type=click.Path(path_type=Path), default=None)
 def vlm(image_path: Path, config_path: Path, output_dir: Path | None) -> None:
     """Run VLM element recognition only."""
 

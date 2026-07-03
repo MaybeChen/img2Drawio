@@ -17,8 +17,12 @@ Each recognition stage writes a JSON result and an annotated image.
 ```bash
 poetry install
 cp config.yaml.example config.yaml
+img2drawio ocr path/to/image.png --config config.yaml --output-dir outputs
+img2drawio yolo path/to/image.png --config config.yaml --output-dir outputs
 img2drawio vlm path/to/image.png --config config.yaml --output-dir outputs
 ```
+
+OCR、YOLO、VLM 三个阶段都可以单独执行，并会分别生成 JSON 中间结果和标注图片。
 
 Run the full pipeline skeleton:
 
