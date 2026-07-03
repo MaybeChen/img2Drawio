@@ -12,3 +12,5 @@ models/ocr/*
 !models/ocr/.gitkeep
 models/yolo/*
 !models/yolo/.gitkeep
+input/*
+!input/.gitkeep
