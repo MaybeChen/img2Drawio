@@ -1,20 +1,48 @@
-from img2drawio.recognition.vlm import _items_from_response
+from img2drawio.models import BBox, RecognitionItem, RecognitionResult
+from img2drawio.recognition.vlm import _build_user_context, _items_from_response
 
 
-def test_items_from_vlm_response():
+def test_items_from_vlm_schema_response_skips_low_confidence():
     items = _items_from_response(
         {
-            "elements": [
+            "page_regions": [
+                {"id": "region_001", "type": "header_area", "bbox": [0, 0, 1000, 80], "confidence": 0.9}
+            ],
+            "containers": [
                 {
-                    "label": "server",
-                    "bbox": {"x": 10, "y": 20, "width": 30, "height": 40},
-                    "confidence": 0.9,
+                    "id": "container_001",
+                    "type": "container",
+                    "bbox": [10, 20, 300, 400],
+                    "parent_id": None,
+                    "style": {"stroke_width_level": "normal"},
+                    "confidence": 0.8,
                 }
-            ]
+            ],
+            "nodes": [
+                {"id": "node_001", "type": "rectangle", "bbox": [20, 30, 80, 40], "confidence": 0.64}
+            ],
         }
     )
 
-    assert len(items) == 1
-    assert items[0].id == "element_1"
-    assert items[0].label == "server"
-    assert items[0].bbox.x == 10
+    assert [item.id for item in items] == ["region_001", "container_001"]
+    assert items[1].label == "container"
+    assert items[1].bbox.x == 10
+    assert items[1].attributes["coordinate_system"] == "normalized_0_1000"
+
+
+def test_user_context_includes_ocr_and_yolo_reference_boxes():
+    ocr = RecognitionResult(
+        image_path="demo.png",
+        stage="ocr",
+        items=[RecognitionItem(id="text_1", label="text", kind="text", bbox=BBox(1, 2, 3, 4))],
+    )
+    yolo = RecognitionResult(
+        image_path="demo.png",
+        stage="yolo",
+        items=[RecognitionItem(id="connector_1", label="arrow", kind="connector", bbox=BBox(5, 6, 7, 8))],
+    )
+
+    context = _build_user_context(ocr, yolo)
+
+    assert '"ocr_text_boxes_normalized_0_1000": [{"id": "text_1", "bbox": [1, 2, 3, 4]' in context
+    assert '"yolo_connector_boxes_normalized_0_1000": [{"id": "connector_1", "bbox": [5, 6, 7, 8]' in context

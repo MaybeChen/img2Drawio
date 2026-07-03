@@ -44,11 +44,15 @@ def convert(image_path: Path, config_path: Path, output_dir: Path | None, drawio
     config = load_config(config_path)
     out_dir = output_dir or config.paths.output_dir
 
-    vlm_result = VLMRecognizer(config.vlm).recognize(image_path)
     ocr_result = PaddleOCRRecognizer(config.paths.ocr_model_dir).recognize(image_path)
     yolo_result = YOLOConnectorRecognizer(config.paths.yolo_model_dir).recognize(image_path)
+    vlm_result = VLMRecognizer(config.vlm).recognize(
+        image_path,
+        ocr_result=ocr_result,
+        yolo_result=yolo_result,
+    )
 
-    for result in (vlm_result, ocr_result, yolo_result):
+    for result in (ocr_result, yolo_result, vlm_result):
         save_stage_outputs(result, out_dir)
 
     diagram = build_diagram_model(image_path, vlm_result, ocr_result, yolo_result)
