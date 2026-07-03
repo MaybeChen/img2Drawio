@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "img2drawio"
+version = "0.1.0"
+description = "Convert images into draw.io diagrams with VLM, PaddleOCR, and YOLO11 recognition."
+authors = ["img2Drawio contributors"]
+readme = "README.md"
+packages = [{ include = "img2drawio", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+PyYAML = ">=6.0.1,<7.0.0"
+Pillow = ">=10.0.0,<12.0.0"
+requests = ">=2.31.0,<3.0.0"
+paddleocr = ">=3.7.0,<4.0.0"
+paddlepaddle = ">=3.0.0,<3.3.0"
+ultralytics = ">=8.3.0,<9.0.0"
+click = ">=8.1.0,<9.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0.0,<9.0.0"
+ruff = ">=0.6.0,<1.0.0"
+
+[tool.poetry.scripts]
+img2drawio = "img2drawio.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
