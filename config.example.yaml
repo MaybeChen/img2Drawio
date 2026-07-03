@@ -1,0 +1,11 @@
+vlm:
+  base_url: "https://your-openai-compatible-endpoint/v1"
+  model: "your-vlm-model"
+  x_hw_id: "your-x-hw-id"
+  x_hw_appkey: "your-x-hw-appkey"
+  timeout: 120
+  proxy: null
+paths:
+  ocr_model_dir: "models/ocr"
+  yolo_model_dir: "models/yolo"
+  output_dir: "outputs"
