@@ -235,6 +235,9 @@ def api_image_request(
     from io import BytesIO
 
     import requests
+    import urllib3
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     img_io = BytesIO()
     image.save(img_io, "PNG")
@@ -259,7 +262,7 @@ def api_image_request(
         **params,
     }
     response = requests.post(
-        f"{base_url.rstrip('/')}/chat/completions",
+        _chat_completions_url(base_url),
         headers=headers,
         json=payload,
         timeout=timeout,
@@ -271,6 +274,13 @@ def api_image_request(
         raise RuntimeError(f"Error calling the API. Response was {response.text}")
     response.raise_for_status()
     return _parse_stream_response(response)
+
+
+def _chat_completions_url(base_url: str) -> str:
+    normalized = base_url.rstrip("/")
+    if normalized.endswith("/chat/completions"):
+        return normalized
+    return f"{normalized}/chat/completions"
 
 
 def _parse_stream_response(response: Any) -> Iterable[str]:

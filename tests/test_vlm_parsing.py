@@ -1,6 +1,7 @@
 from img2drawio.models import BBox, RecognitionItem, RecognitionResult
 from img2drawio.recognition.vlm import (
     _build_proxies,
+    _chat_completions_url,
     _build_user_context,
     _items_from_response,
     _parse_stream_response,
@@ -74,3 +75,15 @@ def test_build_proxies_returns_requests_proxy_mapping():
         "http": "http://127.0.0.1:8080",
         "https": "http://127.0.0.1:8080",
     }
+
+
+def test_chat_completions_url_does_not_duplicate_suffix():
+    assert _chat_completions_url("https://example.com/v1") == "https://example.com/v1/chat/completions"
+    assert (
+        _chat_completions_url("https://example.com/v1/chat/completions")
+        == "https://example.com/v1/chat/completions"
+    )
+    assert (
+        _chat_completions_url("https://example.com/v1/chat/completions/")
+        == "https://example.com/v1/chat/completions"
+    )

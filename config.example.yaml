@@ -1,4 +1,5 @@
 vlm:
+  # 可以配置到 /v1，也可以直接配置到 /v1/chat/completions；程序不会重复拼接。
   base_url: "https://your-openai-compatible-endpoint/v1"
   model: "your-vlm-model"
   x_hw_id: "your-x-hw-id"
