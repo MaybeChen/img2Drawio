@@ -14,6 +14,7 @@ class VLMConfig:
     x_hw_id: str
     x_hw_appkey: str
     timeout: float = 120
+    proxy: str | None = None
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ def _parse_config(raw: dict[str, Any]) -> AppConfig:
             x_hw_id=str(vlm_raw["x_hw_id"]),
             x_hw_appkey=str(vlm_raw["x_hw_appkey"]),
             timeout=float(vlm_raw.get("timeout", 120)),
+            proxy=vlm_raw.get("proxy"),
         ),
         paths=PathsConfig(
             ocr_model_dir=Path(paths_raw.get("ocr_model_dir", "models/ocr")),

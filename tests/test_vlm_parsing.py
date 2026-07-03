@@ -1,5 +1,10 @@
 from img2drawio.models import BBox, RecognitionItem, RecognitionResult
-from img2drawio.recognition.vlm import _build_user_context, _items_from_response
+from img2drawio.recognition.vlm import (
+    _build_proxies,
+    _build_user_context,
+    _items_from_response,
+    _parse_stream_response,
+)
 
 
 def test_items_from_vlm_schema_response_skips_low_confidence():
@@ -46,3 +51,26 @@ def test_user_context_includes_ocr_and_yolo_reference_boxes():
 
     assert '"ocr_text_boxes_normalized_0_1000": [{"id": "text_1", "bbox": [1, 2, 3, 4]' in context
     assert '"yolo_connector_boxes_normalized_0_1000": [{"id": "connector_1", "bbox": [5, 6, 7, 8]' in context
+
+
+def test_parse_stream_response_concatenates_delta_content():
+    class FakeResponse:
+        def iter_lines(self):
+            return iter(
+                [
+                    b'',
+                    b'data: {"choices":[{"delta":{"content":"{\\\"a\\\":"}}]}',
+                    b'data: {"choices":[{"delta":{"content":"1}"}}]}',
+                    b'data: [DONE]',
+                ]
+            )
+
+    assert ''.join(_parse_stream_response(FakeResponse())) == '{"a":1}'
+
+
+def test_build_proxies_returns_requests_proxy_mapping():
+    assert _build_proxies(None) is None
+    assert _build_proxies("http://127.0.0.1:8080") == {
+        "http": "http://127.0.0.1:8080",
+        "https": "http://127.0.0.1:8080",
+    }

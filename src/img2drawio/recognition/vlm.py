@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
-import mimetypes
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterable
 
 from img2drawio.models import BBox, RecognitionItem, RecognitionResult
 from img2drawio.recognition.base import parse_json_object
@@ -184,21 +183,10 @@ VLM_SYSTEM_PROMPT = """你是“图片转 draw.io 非文本结构识别器”。
 
 
 class VLMRecognizer:
-    """Recognize non-text, non-connector visual structures with an OpenAI-compatible VLM."""
+    """Recognize non-text, non-connector visual structures with a streaming VLM API."""
 
     def __init__(self, config: "VLMConfig") -> None:
         self.config = config
-        from openai import OpenAI
-
-        self.client = OpenAI(
-            api_key="unused",
-            base_url=str(config.base_url),
-            default_headers={
-                "X-HW-ID": config.x_hw_id,
-                "X-HW-APPKEY": config.x_hw_appkey,
-            },
-            timeout=config.timeout,
-        )
 
     def recognize(
         self,
@@ -206,24 +194,25 @@ class VLMRecognizer:
         ocr_result: RecognitionResult | None = None,
         yolo_result: RecognitionResult | None = None,
     ) -> RecognitionResult:
+        from PIL import Image
+
         path = Path(image_path)
-        image_url = _image_to_data_url(path)
-        response = self.client.chat.completions.create(
-            model=self.config.model,
-            messages=[
-                {"role": "system", "content": VLM_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": _build_user_context(ocr_result, yolo_result)},
-                        {"type": "image_url", "image_url": {"url": image_url}},
-                    ],
-                },
-            ],
-            response_format={"type": "json_object"},
-        )
-        content = response.choices[0].message.content or "{}"
-        parsed = parse_json_object(content)
+        prompt = _build_prompt(ocr_result, yolo_result)
+        with Image.open(path) as image:
+            content = "".join(
+                api_image_request(
+                    image=image,
+                    prompt=prompt,
+                    base_url=str(self.config.base_url),
+                    model=self.config.model,
+                    x_hw_id=self.config.x_hw_id,
+                    x_hw_appkey=self.config.x_hw_appkey,
+                    timeout=self.config.timeout,
+                    proxy=self.config.proxy,
+                    response_format={"type": "json_object"},
+                )
+            )
+        parsed = parse_json_object(content or "{}")
         return RecognitionResult(
             image_path=path,
             stage="vlm",
@@ -231,6 +220,89 @@ class VLMRecognizer:
             raw_response=parsed,
         )
 
+
+def api_image_request(
+    image: "Image.Image",
+    prompt: str,
+    base_url: str,
+    model: str,
+    x_hw_id: str,
+    x_hw_appkey: str,
+    timeout: float,
+    proxy: str | None = None,
+    **params: Any,
+) -> Iterable[str]:
+    from io import BytesIO
+
+    import requests
+
+    img_io = BytesIO()
+    image.save(img_io, "PNG")
+    image_base64 = base64.b64encode(img_io.getvalue()).decode("utf-8")
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": image_base64},
+            ],
+        }
+    ]
+    headers = {
+        "X-HW-ID": x_hw_id,
+        "X-HW-APPKEY": x_hw_appkey,
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+        **params,
+    }
+    response = requests.post(
+        f"{base_url.rstrip('/')}/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=timeout,
+        verify=False,
+        stream=True,
+        proxies=_build_proxies(proxy),
+    )
+    if not response.ok:
+        raise RuntimeError(f"Error calling the API. Response was {response.text}")
+    response.raise_for_status()
+    return _parse_stream_response(response)
+
+
+def _parse_stream_response(response: Any) -> Iterable[str]:
+    for line in response.iter_lines():
+        if not line:
+            continue
+        if line.startswith(b"data:"):
+            chunk = line[5:].decode("utf-8").strip()
+            if chunk == "[DONE]":
+                return
+            chunk_json = json.loads(chunk)
+            if not chunk_json.get("choices"):
+                yield ""
+                continue
+            generations = [
+                generation.get("delta", {}).get("content", "")
+                for generation in chunk_json.get("choices", [])
+            ]
+            yield "".join(generations)
+
+
+def _build_proxies(proxy: str | None) -> dict[str, str] | None:
+    if not proxy:
+        return None
+    return {"http": proxy, "https": proxy}
+
+
+def _build_prompt(
+    ocr_result: RecognitionResult | None,
+    yolo_result: RecognitionResult | None,
+) -> str:
+    return f"{VLM_SYSTEM_PROMPT}\n\n输入辅助信息：\n{_build_user_context(ocr_result, yolo_result)}"
 
 def _build_user_context(
     ocr_result: RecognitionResult | None,
@@ -257,12 +329,6 @@ def _reference_boxes(result: RecognitionResult | None) -> list[dict[str, Any]]:
             }
         )
     return boxes
-
-
-def _image_to_data_url(path: Path) -> str:
-    mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime_type};base64,{encoded}"
 
 
 def _items_from_response(parsed: dict[str, Any]) -> list[RecognitionItem]:
